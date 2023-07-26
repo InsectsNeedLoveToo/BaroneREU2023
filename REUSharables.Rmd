@@ -1,0 +1,220 @@
+---
+title: "DataScienceSharables"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+```{r}
+###Data Importing
+#The data should be availble through GetHub
+
+
+###############Packages Used####################################################
+'datasets'
+'caTools'
+'party'
+'dplyr'
+'magrittr'
+'factoextra'
+'tidyverse'
+
+```
+
+
+```{r}
+###Pre-processing
+#Before you can visualize how data relates to each other, it's important
+#to understand how the data needs to be formatted
+#Let's use a small example from the GetHub Labeled "WaterTemp.csv"
+
+WaterTemp <- read.csv("C:/Users/Silve/OneDrive/Documents/REU/DataFiles/OGCSVs/WaterTemp.csv")
+#It's good to double check variable names when downloading other people's data
+print(WaterTemp)
+
+#In this case, the data format can't be used. Thus we need to ammend the collumb
+library(tidyverse)
+
+mutate(WaterTemp[2])
+
+```
+
+
+```{r}
+###Visulizing Coorilations
+library(ggplot2)
+library(ggcorrplot)
+
+Orders<-read.csv("C:/Users/Silve/OneDrive/Documents/REU/DataFiles/Insects.csv")
+print(Orders)
+
+# calulate the correlations
+##df = composition
+r <- cor(Orders, use="complete.obs")
+round(r,2)
+ggcorrplot(r)
+
+```
+
+
+```{r}
+###Linear Regression
+library(tidymodels)
+library(ggplot2)
+library(ggcorrplot)
+
+# Read the dataset and convert the target variable to a factor
+
+Orders<-read.csv("C:/Users/Silve/OneDrive/Documents/REU/DataFiles/Insects.csv")
+print(Orders)
+
+#There are many options for linear regression. First is the lm() function
+lm(Orders[c(3,4)])
+
+##To visulize the model try:
+
+lmInsects = lm(Coleoptera~Araneae, data = Orders) #Create the linear regression
+plot(Orders[c(3,4)] , pch=16, col = "blue") #Plot the results
+
+abline(lmInsects) #Add a regression line
+
+```
+
+
+```{r}
+###Logistical Regression
+library(tidymodels)
+
+# Read the dataset and convert the target variable to a factor
+
+TresInv<-read.csv("C:/Users/Silve/OneDrive/Documents/REU/DataFiles/TresIns.csv")
+Orders<-read.csv("C:/Users/Silve/OneDrive/Documents/REU/DataFiles/Insects.csv")
+print(Orders)
+
+##target var can be pulled by using $ for a collumb.
+##The as.factor function is uesd to communicate the binary catigorical data
+TresInv$Site = as.factor(TresInv$Site) 
+
+# Plot job occupation against the target variable
+ggplot(TresInv, aes(Order, fill = Site)) +
+    geom_bar() +
+    coord_flip()
+
+
+# Plot Predicted data and original data points
+ggplot(Orders, aes(x=Ephemeroptera, y=Plot)) + geom_point() +
+      stat_smooth(method="glm", color="green", se=FALSE,
+                method.args = list(family=binomial))
+
+```
+
+
+```{r}
+###Decision Trees
+#Load packages 
+library(datasets)
+library(caTools)
+library(party)
+library(dplyr)
+library(magrittr)
+
+#Load Data 
+DTData<-read.csv("C:/Users/Silve/OneDrive/Documents/REU/DataFiles/DTDataSmall.csv")
+head(DTData) #adds headers
+
+#Test Data for and NA or missing values
+print(DTData)
+is.na(DTData)
+DT_Train <- subset(DTData, !is.na(Type)) #Just in case removes NA from Type
+
+#Split Data for training and testing
+sample_data = sample.split(DT_Train, SplitRatio = 0.8)
+train_data <- subset(DT_Train, sample_data == TRUE)
+test_data <- subset(DT_Train, sample_data == FALSE)
+
+
+#Creating the tree
+model<- ctree(Type ~ ., train_data)
+plot(model)
+
+# testing the Type number 
+predict_model<-predict(model, test_data)
+
+# creates a table to count how many are classified
+# as native speakers and how many are not
+m_at <- table(test_data$Type, predict_model)
+m_at
+
+ac_Test<- sum(diag(m_at)) / sum(m_at)
+print(paste('Accuracy for test is found to be', ac_Test))
+
+
+#####Graphing
+#Create the input data frame.
+input.data <- DTData[c(1:12),]
+
+# Create the tree.
+  output.tree1<-ctree(
+    Type~ Araneae + Coleoptera + Cyclopoida	+ Diptera	+ Ephemeroptera,
+    data = input.data)
+
+# Plot the tree.
+plot(output.tree1)
+
+
+
+```
+
+
+```{r}
+###Primary Components Analysis 
+
+library(factoextra)
+##Loading in test data set
+insects<-read.csv("C:/Users/Silve/OneDrive/Documents/REU/DataFiles/Insects.csv")
+
+##Make the top row headers
+head(insects[c(1:22)])
+
+print(insects)
+any(is.na(insects))
+
+
+##CPA function
+res.pca <- prcomp(insects, scale = FALSE)
+
+
+##Visualize eigenvalues (scree plot). Show the percentage of variances 
+#explained by each principal component.
+fviz_eig(res.pca)
+
+
+##Graph of individuals. Individuals with a similar profile are grouped together.
+fviz_pca_ind(res.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+##Graph of variables. Positive correlated variables point to the same side of 
+#the plot. Negative correlated variables point to opposite sides of the graph.
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+##Biplot of individuals and variables
+fviz_pca_biplot(res.pca, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                )
+```
+
+
+```{r}
+###Next Section
+
+```
+
