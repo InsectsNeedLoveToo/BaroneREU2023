@@ -1,0 +1,302 @@
+---
+title: "DataScienceSharables"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+```{r}
+###############Data Importing###################################################
+#The data should be availble through GetHub
+#The website is https://github.com/InsectsNeedLoveToo/BaroneREU2023/tree/main
+#The data should all be already linked by web links
+
+###############Packages Used####################################################
+'datasets'
+'caTools'
+'party'
+'dplyr'
+'magrittr'
+'factoextra'
+'tidyverse'
+'caret'
+'rpart.plot'
+'ggthemes'
+
+###############Graph Theme###################################################
+library(ggplot2)
+  mytheme <- theme(
+  plot.title = element_text(family = "Times New Roman", face = "bold", 
+  size = (20)),
+  axis.ticks = element_line(colour = "black", size = (0.5)),
+  panel.grid.minor = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.background = element_rect(
+      fill = "white",
+      colour = "black",
+      size = 0.5),
+  axis.line = element_line(size = 0.5, colour = "black"),
+  legend.title = element_text(colour = "black", face = "bold.italic", 
+  family = "Times New Roman"),
+  legend.text = element_text(face = "italic", colour = "black", 
+  family = "Times New Roman"),
+  axis.title = element_text(family = "Times New Roman", size = (20), 
+  colour = "black"),
+  axis.text = element_text(family = "Times New Roman", colour = "black", 
+  size = (15)))
+ 
+
+
+
+
+```
+
+
+```{r}
+###############re-Processing####################################################
+#Before you can visualize how data relates to each other, it's important
+#to understand how the data needs to be formatted
+#Let's use a small example from the GetHub Labeled "WaterTemp.csv"
+
+WaterTemp <- read.csv("https://raw.githubusercontent.com/InsectsNeedLoveToo/BaroneREU2023/main/WaterTemp.csv")                
+#It's good to double check variable names when downloading other people's data
+print(WaterTemp)
+
+#In this case, the data format can't be used. Thus we need to ammend the collumb
+library(tidyverse)
+
+
+```
+
+
+```{r}
+###############Visualizing Correlations#########################################
+####Quick Visualization#########################################################
+library(ggplot2)
+library(ggcorrplot)
+
+Orders<-read.csv("https://raw.githubusercontent.com/InsectsNeedLoveToo/BaroneREU2023/main/Insects.csv")
+print(Orders)
+
+# calulate the correlations
+##df = composition
+r <- cor(Orders, use="complete.obs")
+round(r,2)
+ggcorrplot(r) + mytheme
+
+
+####Removing Coorilated Variables#########################################################
+library(dplyr)
+library(caret)
+library(magrittr)
+# Check for highly correlated predictors and remove highly correlated 
+# predictors using a cutoff value of 85%
+predictors<-Orders[c(3:22)]
+highCorr <- findCorrelation(cor(predictors), cutoff = 0.85)
+message("Omitted highly correlated predictors above cutoff value of 0.85: ", paste(names(predictors[highCorr]), collapse = ", "))
+#This tells us that Ephemeroptera, Cyclopoida, Trombidiformes, Venerida are 
+#Highly corrilated. This makes sense since they are all aqautic invertabrates
+#That live in small order rivers.
+
+
+# This is substrate.sediment, swapping to other pair (substrate.macrophyte) to aid interpretation by readers
+#predictors <- predictors[-highCorr] 
+predictors_clear <- predictors %>% select(-Cyclopoida, -Trombidiformes, -Venerida)
+str(predictors_clear) # 12 observations, 17 variables, n<P (not ideal situation)
+#Ideally the number of obs. would be larger than the variables.
+#This data was collected in a short time frame for a very short study.
+colnames(predictors_clear)
+# Explore correlations
+corrplot::corrplot(cor(predictors_clear, use = "complete.obs"), type = "upper",
+                   method = "number")
+```
+
+
+```{r}
+###############Linear Regression################################################
+library(tidymodels)
+library(ggplot2)
+library(ggcorrplot)
+
+# Read the dataset and convert the target variable to a factor
+
+Orders<-read.csv("https://raw.githubusercontent.com/InsectsNeedLoveToo/BaroneREU2023/main/Insects.csv")
+print(Orders)
+
+#There are many options for linear regression. First is the lm() function
+lm(Orders[c(3,4)])
+
+##To visualize the model use:
+lmInsects = lm(Coleoptera~Araneae, data = Orders) #Create the linear regression
+plot(Orders[c(3,4)] , pch=16, col = "blue") #Plot the results
+abline(lmInsects) #Add a regression line
+
+
+##To visualize the model use:
+ggplot(Orders, aes(x=Araneae, y=Coleoptera), color = grp) + mytheme + 
+     geom_point(size = 5) +
+     geom_smooth(method = "lm", se = FALSE, size = 2, color = "black") + 
+     labs(y = "Coleoptera (Count)", x = "Araneae (Count)")                                                    
+                                                     
+```
+
+
+```{r}
+###############Logistical Regressions###########################################
+library(tidymodels)
+library(ggthemes)
+
+# Read the dataset and convert the target variable to a factor
+
+TresIns<-read.csv("https://raw.githubusercontent.com/InsectsNeedLoveToo/BaroneREU2023/main/TresIns.csv")
+Orders<-read.csv("https://raw.githubusercontent.com/InsectsNeedLoveToo/BaroneREU2023/main/Insects.csv")
+print(Orders)
+
+#The chat seen in the matching poster was made using Excel. This is a similar 
+#compound bar chart used in R with site used instead of plot type
+##target var can be pulled by using $ for a column
+##The as.factor function is used to communicate the binary categorical data
+TresIns$Site = as.factor(TresIns$Site) 
+
+# Plot job occupation against the target variable
+ggplot(TresIns, aes(Order, fill = Site)) +
+    geom_bar() + labs(y = "Count", x = "Insect Order") + 
+    coord_flip() + mytheme
+
+
+# Plot Predicted data and original data points
+ggplot(Orders, aes(x=Ephemeroptera, y=Plot)) + geom_point(size=5) + mytheme + 
+      labs(y = "Plot Types (Terestrial & Aquatic)", x = "Ephemeroptera (Count)") + 
+      stat_smooth(method="glm", color="blue", size = 2, se=FALSE,
+                method.args = list(family=binomial))
+
+```
+
+
+```{r}
+###############Decision Trees###################################################
+#Load packages 
+library(datasets)
+library(caTools)
+library(party)
+library(dplyr)
+library(magrittr)
+library(caret)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+
+#Load Data 
+DTData<-read.csv("https://raw.githubusercontent.com/InsectsNeedLoveToo/BaroneREU2023/main/DTDataSmall.csv")
+head(DTData) #adds headers
+
+#Test Data for and NA or missing values
+print(DTData) #You can manually check for NA by printing the data
+is.na(DTData) #Searches for any NA in data
+
+###DT_Train$Type <- as.factor(DT_Train$Type) #Can be used for numerical 
+#conversion for easier computing for some tree models
+
+#Normalize the parameters as a pre-processing mesure
+norm_param <- preProcess(DTData)
+
+
+#Split Data for training and testing
+sample_data = sample.split(DTData, SplitRatio = 0.8)
+train_data_sub <- subset(DTData, sample_data == TRUE)
+test_data <- subset(DTData, sample_data == FALSE)
+
+#The model now predicts based on parterns seen in the train_data set
+train_data <- predict(norm_param, DTData) 
+##test_data <- predict(norm_param, dataset)
+#The model now predicts based on parterns seen in the train_data set
+
+
+#Create the tree
+mytree <- rpart(
+  Type ~ ., 
+  data = train_data, 
+  method = "class", 
+  minsplit = 2, 
+  minbucket = 1)
+
+# plot mytree
+fancyRpartPlot(mytree, caption = NULL)
+
+# testing the Type number 
+predict_model<-predict(mytree, test_data)
+
+# creates a table to count how many are classified
+m_at <- table(test_data$Type, predict_model)
+
+ac_Test<- sum(diag(m_at)) / sum(m_at)
+print(paste('Accuracy for test is found to be', ac_Test))
+
+```
+
+
+```{r}
+###############Primary Component Analysis (PCA)#################################
+
+library(factoextra)
+##Loading in test data set
+insects<-read.csv("https://raw.githubusercontent.com/InsectsNeedLoveToo/BaroneREU2023/main/Insects.csv")
+
+##Make the top row headers
+head(insects[c(1:22)])
+
+print(insects)
+any(is.na(insects))
+
+
+##CPA function
+res.pca <- prcomp(insects, scale = FALSE)
+
+
+##Visualize eigenvalues (scree plot). Show the percentage of variances 
+#explained by each principal component.
+fviz_eig(res.pca) + mytheme + 
+  labs(y = "Explained Variances(%)", x = "Dimensions") 
+
+
+##Graph of individuals. Individuals with a similar profile are grouped together.
+fviz_pca_ind(res.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             ) + mytheme
+
+##Graph of variables. Positive correlated variables point to the same side of 
+#the plot. Negative correlated variables point to opposite sides of the graph.
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             ) + mytheme + labs(y = "Dimension 2 (17.6%)", x = "Dimension 1 (61.9%)")
+
+##Biplot of individuals and variables
+fviz_pca_biplot(res.pca, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                ) + mytheme
+```
+
+
+```{r}
+###############Meta Data########################################################
+#All data used in this example hand out was collected by Stelle A. BArone in 
+#partnership with the REU and McNair Scholars programs at Michigan Technological
+#University. 
+
+#The dates of data collection are shown in the "WaterTemp.csv"(all in June 2023)
+#For more information on how the data was collected and organized, please head
+#to the GetHUb page listed at the top for the Read.Me file.
+
+#This is a very basic demonstration of a few types of models and should be 
+#adapted to each projects needs if used as a resource.
+
+#If you have further questions, please email Stelle Barone at sbarone@mtu.edu
+#with "Data Science Sharables" in the subject line. 
+```
+
